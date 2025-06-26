@@ -59,23 +59,28 @@ if show_report:
 
 # Decision boundary (2D only)
 def plot_decision_boundary(X, y, clf, title):
-    h = 0.02
+    if X.shape[1] != 2:
+        st.warning("Decision boundary plot requires exactly 2 features. Skipping this plot.")
+        return
+
     x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
     y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
+    h = 0.02
     xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
                          np.arange(y_min, y_max, h))
-    Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
-    Z = Z.reshape(xx.shape)
-    cmap_light = ListedColormap(['#FFAAAA', '#AAFFAA', '#AAAAFF', '#FFF0AA'])
-    cmap_bold = ListedColormap(['#FF0000', '#00FF00', '#0000FF', '#FFD700'])
+    try:
+        Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
+        Z = Z.reshape(xx.shape)
 
-    fig, ax = plt.subplots()
-    ax.contourf(xx, yy, Z, alpha=0.4, cmap=cmap_light)
-    scatter = ax.scatter(X[:, 0], X[:, 1], c=y, cmap=cmap_bold, edgecolor='k', s=20)
-    ax.set_title(f"Decision Boundary - {classifier_name}")
-    ax.set_xlabel("Feature 1 (scaled)")
-    ax.set_ylabel("Feature 2 (scaled)")
-    ax.legend(*scatter.legend_elements(), title="Classes")
-    st.pyplot(fig)
+        fig, ax = plt.subplots()
+        ax.contourf(xx, yy, Z, alpha=0.3)
+        scatter = ax.scatter(X[:, 0], X[:, 1], c=y, cmap=plt.cm.Set1, edgecolor='k')
+        ax.set_title(title)
+        ax.set_xlabel("Feature 1 (scaled)")
+        ax.set_ylabel("Feature 2 (scaled)")
+        st.pyplot(fig)
+    except Exception as e:
+        st.warning(f"Could not plot decision boundary: {e}")
+
 
 plot_decision_boundary(X_test, y_test, clf, f"Decision Boundary - {classifier_name}")
