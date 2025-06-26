@@ -1,75 +1,81 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import ConfusionMatrixDisplay, accuracy_score
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 
-# Load dataset
-df = pd.read_csv("multiclass_data.csv")
-X = df[['feature1', 'feature2']].values
-y = df['labels'].values
+# Load and prepare data
+data = pd.read_csv("multiclass_data.csv")
+X = data.iloc[:, :-1].values
+y = data.iloc[:, -1].values
 
-# Train/test split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
-
-# Standardize features
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
 
-# Sidebar model selection
+# Classifier options
+classifiers = {
+    "Logistic Regression": LogisticRegression(),
+    "Support Vector Machine": SVC(probability=True),
+    "Decision Tree": DecisionTreeClassifier(),
+    "K-Nearest Neighbors": KNeighborsClassifier()
+}
+
+# Streamlit UI
 st.title("Multiclass Classification Demo")
-model_name = st.sidebar.selectbox("Choose Classifier", [
-    "Logistic Regression",
-    "Support Vector Machine",
-    "Decision Tree",
-    "K-Nearest Neighbors"
-])
+classifier_name = st.sidebar.selectbox("Choose Classifier", list(classifiers.keys()))
+show_cm = st.sidebar.checkbox("Show Confusion Matrix", value=True)
+show_report = st.sidebar.checkbox("Show Classification Report", value=True)
 
-# Model setup
-if model_name == "Logistic Regression":
-    model = LogisticRegression(multi_class='ovr')
-elif model_name == "Support Vector Machine":
-    model = SVC(kernel='rbf', gamma='scale')
-elif model_name == "Decision Tree":
-    model = DecisionTreeClassifier()
-else:
-    model = KNeighborsClassifier()
+# Train and predict
+clf = classifiers[classifier_name]
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
 
-# Train model
-model.fit(X_train_scaled, y_train)
-y_pred = model.predict(X_test_scaled)
-
-# Accuracy
-acc = accuracy_score(y_test, y_pred)
-st.write(f"**Accuracy:** {acc:.2f}")
+accuracy = np.mean(y_pred == y_test)
+st.write(f"Accuracy: {accuracy:.2f}")
 
 # Confusion matrix
-fig_cm, ax_cm = plt.subplots()
-ConfusionMatrixDisplay.from_predictions(y_test, y_pred, ax=ax_cm)
-st.pyplot(fig_cm)
+if show_cm:
+    cm = confusion_matrix(y_test, y_pred)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    fig, ax = plt.subplots()
+    disp.plot(ax=ax)
+    st.pyplot(fig)
 
-# Decision boundary plot
-x_min, x_max = X_train_scaled[:, 0].min() - 1, X_train_scaled[:, 0].max() + 1
-y_min, y_max = X_train_scaled[:, 1].min() - 1, X_train_scaled[:, 1].max() + 1
-xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.02), np.arange(y_min, y_max, 0.02))
+# Classification report
+if show_report:
+    report = classification_report(y_test, y_pred, output_dict=True)
+    st.write("Precision / Recall / F1 Score:")
+    st.dataframe(pd.DataFrame(report).transpose())
 
-Z = model.predict(np.c_[xx.ravel(), yy.ravel()])
-Z = Z.reshape(xx.shape)
+# Decision boundary (2D only)
+def plot_decision_boundary(X, y, clf, title):
+    h = 0.02
+    x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
+    y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
+                         np.arange(y_min, y_max, h))
+    Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
+    Z = Z.reshape(xx.shape)
+    cmap_light = ListedColormap(['#FFAAAA', '#AAFFAA', '#AAAAFF', '#FFF0AA'])
+    cmap_bold = ListedColormap(['#FF0000', '#00FF00', '#0000FF', '#FFD700'])
 
-fig, ax = plt.subplots()
-ax.contourf(xx, yy, Z, alpha=0.3)
-scatter = ax.scatter(X_train_scaled[:, 0], X_train_scaled[:, 1], c=y_train, edgecolor='k', cmap='tab10')
-legend_labels = np.unique(y_train)
-legend_handles = [plt.Line2D([0], [0], marker='o', linestyle='', color=scatter.cmap(scatter.norm(i))) for i in legend_labels]
-ax.legend(legend_handles, legend_labels, title="Classes")
-ax.set_title(f"Decision Boundary - {model_name}")
-ax.set_xlabel("Feature 1 (scaled)")
-ax.set_ylabel("Feature 2 (scaled)")
-st.pyplot(fig)
+    fig, ax = plt.subplots()
+    ax.contourf(xx, yy, Z, alpha=0.4, cmap=cmap_light)
+    scatter = ax.scatter(X[:, 0], X[:, 1], c=y, cmap=cmap_bold, edgecolor='k', s=20)
+    ax.set_title(f"Decision Boundary - {classifier_name}")
+    ax.set_xlabel("Feature 1 (scaled)")
+    ax.set_ylabel("Feature 2 (scaled)")
+    ax.legend(*scatter.legend_elements(), title="Classes")
+    st.pyplot(fig)
+
+plot_decision_boundary(X_test, y_test, clf, f"Decision Boundary - {classifier_name}")
