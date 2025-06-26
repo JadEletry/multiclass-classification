@@ -34,13 +34,18 @@ model_name = st.sidebar.selectbox("Choose Classifier", [
 
 # Model setup
 if model_name == "Logistic Regression":
-    model = LogisticRegression(multi_class='ovr')
+    C = st.sidebar.slider("Regularization Strength (C)", 0.01, 10.0, 1.0)
+    model = LogisticRegression(C=C, multi_class='ovr', max_iter=200)
 elif model_name == "Support Vector Machine":
-    model = SVC(kernel='rbf', gamma='scale')
+    C = st.sidebar.slider("Regularization (C)", 0.01, 10.0, 1.0)
+    gamma = st.sidebar.selectbox("Kernel Coefficient (gamma)", ["scale", "auto"])
+    model = SVC(C=C, kernel='rbf', gamma=gamma)
 elif model_name == "Decision Tree":
-    model = DecisionTreeClassifier()
+    max_depth = st.sidebar.slider("Max Depth", 1, 15, 5)
+    model = DecisionTreeClassifier(max_depth=max_depth)
 else:
-    model = KNeighborsClassifier()
+    k = st.sidebar.slider("Number of Neighbors (k)", 1, 15, 5)
+    model = KNeighborsClassifier(n_neighbors=k)
 
 # Train model
 model.fit(X_train_scaled, y_train)
